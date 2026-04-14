@@ -6,20 +6,18 @@ from google import genai
 import plotly.express as px
 
 # ==========================================
-# 1. SETUP & API KEYS (SECURED)
+# 1. SETUP & SECURE API KEYS
 # ==========================================
-# We now pull these from Streamlit's hidden secrets manager
+# Keys are pulled from Streamlit's secrets manager for cloud deployment
 OMDB_API_KEY = st.secrets["OMDB_API_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
-# Initialize Gemini Client
+# Initialize Gemini 2.5 Flash Client
 client = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_ID = 'gemini-2.5-flash'
 
-# ... (The rest of your code remains exactly the same) ...
-
 # ==========================================
-# 2. FUNCTIONS
+# 2. FUNCTIONS (Updated for Method 1)
 # ==========================================
 def fetch_poster(movie_title):
     formatted_title = movie_title.replace(" ", "+")
@@ -35,9 +33,12 @@ def fetch_poster(movie_title):
         return "https://via.placeholder.com/500x750?text=Error"
 
 def recommend(movie):
+    # Find the index of the selected movie
     movie_index = movies[movies['title'] == movie].index[0]
-    distances = similarity[movie_index]
-    movies_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
+    
+    # NEW METHOD 1 LOGIC: No calculating or sorting!
+    # Retrieve the pre-computed top 5 nearest neighbors directly from the dictionary
+    movies_list = similarity[movie_index][:5] 
     
     recommended_movies = []
     recommended_movies_posters = []
@@ -52,26 +53,26 @@ def recommend(movie):
 # ==========================================
 # 3. LOAD DATA
 # ==========================================
-# Load the ML data (for the recommender)
+# Load the ML data
 movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
-similarity = pickle.load(open('similarity.pkl', 'rb'))
 
-# Load the full metadata (for the dashboard)
-# IMPORTANT: Make sure you exported this from your Jupyter notebook!
+# Load the newly compressed Top 10 similarity dictionary
+similarity = pickle.load(open('similarity_top10.pkl', 'rb'))
+
+# Load the EDA data for the dashboard
 try:
     movies_eda = pickle.load(open('movies_eda.pkl', 'rb')) 
 except FileNotFoundError:
-    st.error("⚠️ movies_eda.pkl not found! The dashboard tab will not work. Please export it from your Jupyter notebook.")
-    movies_eda = pd.DataFrame() # Create empty dataframe so app doesn't crash
+    st.error("⚠️ movies_eda.pkl not found! The dashboard tab will not work.")
+    movies_eda = pd.DataFrame()
 
 # ==========================================
 # 4. APP UI & TABS
 # ==========================================
-st.set_page_config(page_title="Movie Hub", layout="wide") # Makes the app wider to fit charts nicely
+st.set_page_config(page_title="Movie Hub", layout="wide")
 st.title('🎬 Movie Recommender & Analytics Hub')
 
-# Create the Tabs
 tab1, tab2 = st.tabs(["🤖 Recommendation Engine", "📊 Data Analytics Dashboard"])
 
 # ------------------------------------------
@@ -161,7 +162,6 @@ with tab2:
         st.header("Explore the TMDB Dataset")
         st.markdown("Interactive visualizations exploring the metadata of 4,800+ movies.")
 
-        # Layout for charts (Side by side)
         chart_col1, chart_col2 = st.columns(2)
 
         with chart_col1:
